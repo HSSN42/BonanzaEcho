@@ -1,8 +1,6 @@
 // src/utils/assemblyAI.js
 const axios = require('axios');
 const { createClient } = require('@supabase/supabase-js');
-const fs = require('fs');
-const path = require('path');
 
 // Environment variables
 const assemblyApiKey = process.env.ASSEMBLY_API_KEY || '7c2f6e1ac9e647a196cf5e249942c95c';
@@ -16,28 +14,6 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const assemblyHeaders = {
   'Authorization': assemblyApiKey,
   'Content-Type': 'application/json'
-};
-
-/**
- * Uploads an audio file to Assembly AI for transcription
- * 
- * @param {string} filePath - Path to the audio file
- * @returns {Promise<string>} - The upload URL
- */
-const uploadFileToAssemblyAI = async (filePath) => {
-  try {
-    const data = fs.readFileSync(filePath);
-    const response = await axios.post(
-      'https://api.assemblyai.com/v2/upload',
-      data,
-      { headers: assemblyHeaders }
-    );
-    
-    return response.data.upload_url;
-  } catch (error) {
-    console.error('Error uploading file to Assembly AI:', error);
-    throw error;
-  }
 };
 
 /**
@@ -158,8 +134,7 @@ const processTranscription = async (episodeId, transcriptionData) => {
             episode_id: episodeId,
             start_time: segmentStart,
             end_time: currentSegment[currentSegment.length - 1].end / 1000,
-            text: segmentText.trim(),
-            speaker: word.speaker || null // If using speaker diarization
+            text: segmentText.trim()
           });
           
           // Start a new segment
@@ -179,8 +154,7 @@ const processTranscription = async (episodeId, transcriptionData) => {
           episode_id: episodeId,
           start_time: segmentStart,
           end_time: currentSegment[currentSegment.length - 1].end / 1000,
-          text: segmentText.trim(),
-          speaker: currentSegment[0].speaker || null // If using speaker diarization
+          text: segmentText.trim()
         });
       }
       
@@ -268,7 +242,6 @@ const transcribeEpisode = async (episodeId, audioUrl, options = {}) => {
 };
 
 module.exports = {
-  uploadFileToAssemblyAI,
   requestTranscription,
   getTranscriptionResult,
   pollForTranscriptionCompletion,
