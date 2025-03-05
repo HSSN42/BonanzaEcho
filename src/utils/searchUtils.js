@@ -79,74 +79,6 @@ const basicSearch = async (query, options = {}) => {
 };
 
 /**
- * Enhances search results with contextual segments
- * 
- * @param {Array} results - The basic search results
- * @param {Object} options - Context options
- * @returns {Promise<Array>} - The enhanced search results
- */
-const addContextToResults = async (results, options = {}) => {
-  const contextSize = options.contextSize || 1; // Number of segments before and after
-  
-  // If context size is 0, return the original results
-  if (contextSize <= 0) {
-    return results;
-  }
-  
-  try {
-    // For each result, fetch surrounding segments
-    const enhancedResults = await Promise.all(results.map(async (result) => {
-      // Get the segments before and after the matched segment
-      const { data: contextSegments, error } = await supabase
-        .from('transcript_segments')
-        .select('id, start_time, end_time, text')
-        .eq('episode_id', result.episode_id)
-        .or(`start_time.gte.${result.start_time - (contextSize * 30)},end_time.lte.${result.end_time + (contextSize * 30)}`)
-        .order('start_time');
-        
-      if (error) {
-        console.error('Error fetching context segments:', error);
-        return result;
-      }
-      
-      const matchedSegmentIndex = contextSegments.findIndex(seg => seg.id === result.segment_id);
-      
-      // Add context to the result
-      return {
-        ...result,
-        context_before: matchedSegmentIndex > 0 ? contextSegments.slice(0, matchedSegmentIndex) : [],
-        context_after: matchedSegmentIndex < contextSegments.length - 1 ? contextSegments.slice(matchedSegmentIndex + 1) : []
-      };
-    }));
-    
-    return enhancedResults;
-  } catch (error) {
-    console.error('Error adding context to results:', error);
-    // If there's an error, return the original results
-    return results;
-  }
-};
-
-/**
- * Performs semantic search using vector similarity
- * (Note: This requires the pgvector extension and vector embeddings)
- * 
- * @param {string} query - The search query
- * @param {Object} options - Search options
- * @returns {Promise<Array>} - The search results
- */
-const semanticSearch = async (query, options = {}) => {
-  // This is a placeholder for implementing semantic search
-  // Actual implementation would require:
-  // 1. Generating vector embeddings for the query
-  // 2. Finding segments with similar vector embeddings
-  console.log('Semantic search is not implemented yet');
-  
-  // Fall back to basic search
-  return basicSearch(query, options);
-};
-
-/**
  * Performs a combined search using both text and semantic approaches
  * 
  * @param {string} query - The search query
@@ -156,32 +88,7 @@ const semanticSearch = async (query, options = {}) => {
 const searchTranscripts = async (query, options = {}) => {
   try {
     // Get basic text search results
-    let results = await basicSearch(query, options);
-    
-    // If semantic search is enabled and results are limited, try to get more relevant results
-    if (options.semanticSearch && options.limit && results.length < options.limit) {
-      const semanticResults = await semanticSearch(query, {
-        ...options,
-        limit: options.limit - results.length
-      });
-      
-      // Combine results, removing duplicates
-      const seenIds = new Set(results.map(r => r.segment_id));
-      for (const result of semanticResults) {
-        if (!seenIds.has(result.segment_id)) {
-          results.push(result);
-          seenIds.add(result.segment_id);
-        }
-      }
-    }
-    
-    // Add context segments if requested
-    if (options.includeContext) {
-      results = await addContextToResults(results, {
-        contextSize: options.contextSize || 1
-      });
-    }
-    
+    const results = await basicSearch(query, options);
     return results;
   } catch (error) {
     console.error('Search error:', error);
@@ -252,8 +159,6 @@ const getRelatedKeywords = async (query) => {
 
 module.exports = {
   basicSearch,
-  semanticSearch,
   searchTranscripts,
-  addContextToResults,
   getRelatedKeywords
 };
